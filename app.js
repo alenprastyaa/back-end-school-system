@@ -23,15 +23,42 @@ const { setIo, getLearningSubjectRoom, getUserNotificationRoom } = require("./ut
 const app = express();
 const server = http.createServer(app);
 const socketPath = process.env.SOCKET_IO_PATH || "/socket.io";
+const allowedOrigins = [
+  "https://school-system.my.id",
+  "https://alentest.my.id",
+  "http://localhost:8080",
+  "http://localhost:5173",
+];
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Origin not allowed by CORS"));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
 const io = new Server(server, {
   path: socketPath,
   cors: {
-    origin: true,
-    methods: ["GET", "POST"],
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Origin not allowed by CORS"));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization"],
   },
 });
 
-app.use(cors());
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 app.use(express.json());
 
 const resolveSocketToken = (socket) => {
