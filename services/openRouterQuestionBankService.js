@@ -1,6 +1,24 @@
 const DEFAULT_OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free";
 const OPENROUTER_API_URL = process.env.OPENROUTER_API_URL || "https://openrouter.ai/api/v1/chat/completions";
 
+const normalizeProviderError = (message) => {
+  const normalizedMessage = String(message || "").trim();
+  if (!normalizedMessage) {
+    return "Request OpenRouter gagal";
+  }
+
+  const lowered = normalizedMessage.toLowerCase();
+  if (lowered.includes("user not found")) {
+    return "OPENROUTER_API_KEY tidak valid atau akun OpenRouter untuk API key ini tidak ditemukan";
+  }
+
+  if (lowered.includes("invalid api key") || lowered.includes("unauthorized")) {
+    return "OPENROUTER_API_KEY tidak valid atau akses OpenRouter ditolak";
+  }
+
+  return normalizedMessage;
+};
+
 const buildPrompt = ({
   subjectName,
   className,
@@ -189,7 +207,7 @@ const generateQuestionBankItemsWithOpenRouter = async ({
 
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(result?.error?.message || "Request OpenRouter gagal");
+        throw new Error(normalizeProviderError(result?.error?.message || result?.message || "Request OpenRouter gagal"));
       }
 
       return result;
