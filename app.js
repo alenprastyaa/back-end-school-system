@@ -22,7 +22,9 @@ const { ensurePaymentReceiptPaymentDateColumn } = require("./utils/ensurePayment
 const { setIo, getLearningSubjectRoom, getUserNotificationRoom } = require("./utils/socket");
 const app = express();
 const server = http.createServer(app);
+const socketPath = process.env.SOCKET_IO_PATH || "/socket.io";
 const io = new Server(server, {
+  path: socketPath,
   cors: {
     origin: true,
     methods: ["GET", "POST"],
@@ -148,7 +150,7 @@ Promise.all([
     console.error("Failed to ensure runtime database columns", error);
   });
 
-const PORT = 7777 ;
-server.listen(7777, () => {
+const PORT = Number(process.env.PORT) || 7777;
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
