@@ -1,10 +1,9 @@
 const http = require("http");
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
-const dotenv = require("dotenv");
 const jwt = require("jsonwebtoken");
 const { Server } = require("socket.io");
+require("./config/loadEnv");
 const authRoutes = require("./routes/authRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const schoolRoutes = require("./routes/schoolRoutes");
@@ -21,8 +20,6 @@ const { getSubjectById } = require("./models/LearningModel");
 const { ensureUserProfileColumn } = require("./utils/ensureUserProfileColumn");
 const { ensurePaymentReceiptPaymentDateColumn } = require("./utils/ensurePaymentReceiptPaymentDateColumn");
 const { setIo, getLearningSubjectRoom, getUserNotificationRoom } = require("./utils/socket");
-
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
