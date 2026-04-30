@@ -151,7 +151,7 @@ Promise.all([
     console.error("Failed to ensure runtime database columns", error);
   });
 
-const PORT = 9200 ;
-server.listen(9200, () => {
+const PORT = 9900 ;
+server.listen(9900, () => {
   console.log(`Server running on port ${PORT}`);
 });
