@@ -2,6 +2,7 @@ const http = require("http");
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const path = require("path");
 const { Server } = require("socket.io");
 require("./config/loadEnv");
 const authRoutes = require("./routes/authRoutes");
@@ -60,6 +61,7 @@ const io = new Server(server, {
 app.use(cors(corsOptions));
 app.options(/.*/, cors(corsOptions));
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 const resolveSocketToken = (socket) => {
   const authToken = socket.handshake.auth?.token;

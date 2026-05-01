@@ -10,6 +10,8 @@ const {
   getTeacherSubjects,
   getStudentSubjects,
   createLearningMaterial,
+  generateLearningMaterialPptWithAi,
+  publishLearningMaterialPptWithAi,
   createLearningQuestionBankItem,
   generateLearningQuestionBankWithAi,
   saveGeneratedLearningQuestionBankItems,
@@ -62,6 +64,18 @@ router.post(
   checkRole(["GURU"]),
   upload.single("attachment"),
   createLearningMaterial,
+);
+router.post(
+  "/subjects/:subjectId/materials/generate-ai-pptx",
+  checkRole(["GURU"]),
+  upload.none(),
+  generateLearningMaterialPptWithAi,
+);
+router.post(
+  "/subjects/:subjectId/materials/publish-ai-pptx",
+  checkRole(["GURU"]),
+  upload.none(),
+  publishLearningMaterialPptWithAi,
 );
 router.post(
   "/question-bank",

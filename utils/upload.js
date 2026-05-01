@@ -11,10 +11,38 @@ const FALLBACK_MIME_TYPES = {
   ".mp3": "audio/mpeg",
   ".wav": "audio/wav",
   ".pdf": "application/pdf",
+  ".ppt": "application/vnd.ms-powerpoint",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".png": "image/png",
   ".gif": "image/gif",
+};
+
+const LOCAL_UPLOAD_SUBDIR = path.join("uploads", "public");
+
+const sanitizeFileName = (value) =>
+  String(value || "file")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "") || "file";
+
+const resolveLocalPublicBaseUrl = () => {
+  const explicitBaseUrl =
+    process.env.FILE_PUBLIC_BASE_URL
+    || process.env.PUBLIC_FILE_BASE_URL
+    || process.env.PUBLIC_BASE_URL
+    || process.env.BACKEND_PUBLIC_URL;
+
+  if (explicitBaseUrl) {
+    return String(explicitBaseUrl).replace(/\/$/, "");
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    return "https://alentest.my.id";
+  }
+
+  return `http://localhost:${process.env.PORT || 7777}`;
 };
 
 const resolveUploadedFileUrl = (payload) => {
@@ -73,6 +101,22 @@ const uploadToStorage = async (file, { filename, contentType }) => {
   return uploadedUrl;
 };
 
+const saveFileLocally = (file, { filename }) => {
+  if (!file?.path) {
+    throw new Error("File path is required for local upload fallback");
+  }
+
+  fs.mkdirSync(LOCAL_UPLOAD_SUBDIR, { recursive: true });
+  const safeName = sanitizeFileName(filename || path.basename(file.path));
+  const uniqueName = `${Date.now()}-${safeName}`;
+  const destinationPath = path.join(LOCAL_UPLOAD_SUBDIR, uniqueName);
+
+  fs.copyFileSync(file.path, destinationPath);
+
+  const publicBaseUrl = resolveLocalPublicBaseUrl();
+  return `${publicBaseUrl}/uploads/public/${encodeURIComponent(uniqueName)}`;
+};
+
 const uploadImage = async (file) => {
   try {
     if (!file?.path) {
@@ -94,13 +138,17 @@ const uploadImage = async (file) => {
         primaryError?.response?.status === 400 &&
         fallbackContentType !== (file.mimetype || "application/octet-stream")
       ) {
-        return await uploadToStorage(file, {
-          filename: safeFilename,
-          contentType: fallbackContentType,
-        });
+        try {
+          return await uploadToStorage(file, {
+            filename: safeFilename,
+            contentType: fallbackContentType,
+          });
+        } catch (fallbackError) {
+          return saveFileLocally(file, { filename: safeFilename });
+        }
       }
 
-      throw primaryError;
+      return saveFileLocally(file, { filename: safeFilename });
     }
   } catch (error) {
     console.log("UPLOAD ERROR:", error.response?.data || error.message);

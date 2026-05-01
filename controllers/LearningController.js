@@ -9,6 +9,8 @@ const {
   parseQuestionBankDocument,
 } = require("../utils/questionBankDocument");
 const { generateQuestionBankItemsWithOpenRouter } = require("../services/openRouterQuestionBankService");
+const { generatePowerPointOutlineWithOpenRouter } = require("../services/openRouterPptService");
+const { buildPowerPointMaterialFile } = require("../services/pptxMaterialService");
 const {
   createSubject,
   updateSubject,
@@ -499,6 +501,158 @@ const createLearningMaterial = async (req, res) => {
   } catch (error) {
     removeLocalUpload(req.file?.path);
     return errorResponse(res, 500, "Failed Create Material", error.message);
+  }
+};
+
+const generateLearningMaterialPptWithAi = async (req, res) => {
+  try {
+    const { subjectId } = req.params;
+    const {
+      title,
+      topic,
+      content,
+      learning_goals,
+      additional_instructions,
+      slide_count,
+    } = req.body || {};
+
+    const access = await ensureSubjectAccess({
+      subjectId,
+      schoolId: req.schoolId,
+      userRole: req.userRole,
+      userId: req.userId,
+    });
+
+    if (access.error) {
+      return errorResponse(res, access.error.status, access.error.message);
+    }
+
+    const normalizedTitle = String(title || "").trim();
+    const normalizedTopic = String(topic || "").trim();
+    if (!normalizedTitle) {
+      return errorResponse(res, 400, "title is required");
+    }
+
+    if (!normalizedTopic) {
+      return errorResponse(res, 400, "topic is required");
+    }
+
+    const normalizedSlideCount = Number(slide_count);
+    if (!Number.isInteger(normalizedSlideCount) || normalizedSlideCount < 3 || normalizedSlideCount > 15) {
+      return errorResponse(res, 400, "slide_count must be between 3 and 15");
+    }
+
+    const outline = await generatePowerPointOutlineWithOpenRouter({
+      subjectName: access.subject.name,
+      className: access.subject.class_name,
+      topic: normalizedTopic,
+      materialTitle: normalizedTitle,
+      slideCount: normalizedSlideCount,
+      teacherSummary: String(content || "").trim(),
+      learningGoals: String(learning_goals || "").trim(),
+      additionalInstructions: String(additional_instructions || "").trim(),
+    });
+
+    return successResponse(res, 200, "Success Generate AI PowerPoint Preview", {
+      presentation_title: outline.presentationTitle || normalizedTitle,
+      summary: outline.summary,
+      slides_total: outline.slides.length,
+      slides: outline.slides,
+    });
+  } catch (error) {
+    return errorResponse(res, 500, "Failed Generate AI PowerPoint Preview", error.message);
+  }
+};
+
+const normalizeAiPresentationSlides = (slides, fallbackTitle = "Slide") =>
+  (Array.isArray(slides) ? slides : [])
+    .map((slide, index) => {
+      const title = String(slide?.title || "").trim() || `${fallbackTitle} ${index + 1}`;
+      const bullets = Array.isArray(slide?.bullets)
+        ? slide.bullets.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 5)
+        : [];
+
+      if (!bullets.length) {
+        return null;
+      }
+
+      return {
+        title,
+        bullets,
+        speaker_notes: String(slide?.speaker_notes || "").trim() || null,
+      };
+    })
+    .filter(Boolean);
+
+const publishLearningMaterialPptWithAi = async (req, res) => {
+  let generatedFile = null;
+
+  try {
+    const { subjectId } = req.params;
+    const {
+      title,
+      content,
+      presentation_title,
+      slides,
+    } = req.body || {};
+
+    const access = await ensureSubjectAccess({
+      subjectId,
+      schoolId: req.schoolId,
+      userRole: req.userRole,
+      userId: req.userId,
+    });
+
+    if (access.error) {
+      return errorResponse(res, access.error.status, access.error.message);
+    }
+
+    const normalizedTitle = String(title || "").trim();
+    if (!normalizedTitle) {
+      return errorResponse(res, 400, "title is required");
+    }
+
+    const normalizedSlides = normalizeAiPresentationSlides(slides, presentation_title || normalizedTitle);
+    if (normalizedSlides.length === 0) {
+      return errorResponse(res, 400, "slides preview is required");
+    }
+
+    generatedFile = await buildPowerPointMaterialFile({
+      presentationTitle: String(presentation_title || normalizedTitle).trim() || normalizedTitle,
+      subtitle: `${access.subject.name} • ${access.subject.class_name}`,
+      subjectName: access.subject.name,
+      className: access.subject.class_name,
+      slides: normalizedSlides,
+      outputDir: "uploads",
+    });
+
+    const attachmentUrl = await uploadImage({
+      path: generatedFile.outputPath,
+      originalname: generatedFile.fileName,
+      mimetype: generatedFile.mimeType,
+    });
+    removeLocalUpload(generatedFile.outputPath);
+    generatedFile = null;
+
+    const material = await createMaterial(
+      Number(subjectId),
+      normalizedTitle,
+      String(content || "").trim() || `Materi PowerPoint untuk ${access.subject.name}`,
+      attachmentUrl,
+      req.userId,
+    );
+
+    return successResponse(res, 201, "Success Publish AI PowerPoint Material", {
+      material,
+      slides_total: normalizedSlides.length,
+      attachment_url: attachmentUrl,
+    });
+  } catch (error) {
+    if (generatedFile?.outputPath) {
+      removeLocalUpload(generatedFile.outputPath);
+    }
+
+    return errorResponse(res, 500, "Failed Publish AI PowerPoint Material", error.message);
   }
 };
 
@@ -2130,6 +2284,8 @@ module.exports = {
   getTeacherSubjects,
   getStudentSubjects,
   createLearningMaterial,
+  generateLearningMaterialPptWithAi,
+  publishLearningMaterialPptWithAi,
   createLearningQuestionBankItem,
   generateLearningQuestionBankWithAi,
   saveGeneratedLearningQuestionBankItems,
