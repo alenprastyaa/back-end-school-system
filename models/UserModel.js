@@ -126,6 +126,18 @@ const getUsersByRoleAndSchool = async (schoolId, role) => {
   return result.rows;
 };
 
+const findByUsername = async (username) => {
+  const result = await pool.query(
+    `SELECT id, username, password, role, school_id, class_id, parent_email, phone_number, profile_image
+     FROM users
+     WHERE username = $1
+     LIMIT 1`,
+    [username],
+  );
+
+  return result.rows[0] || null;
+};
+
 const getUserById = async (id) => {
   const result = await pool.query(
     `SELECT id, username, password, role, school_id, parent_email, phone_number, profile_image
