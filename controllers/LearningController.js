@@ -20,6 +20,9 @@ const {
   getSubjectsByTeacher,
   getSubjectsByStudent,
   createMaterial,
+  getMaterialById,
+  updateMaterial,
+  deleteMaterialById,
   createQuestionBankItem,
   createQuestionBankItemsBulk,
   getQuestionBankItemById,
@@ -34,10 +37,12 @@ const {
   markChatSubjectAsRead,
   getChatUnreadSummaryBySubjectIds,
   createAssignment,
+  updateTeacherAssignment,
   getExamAssignmentByCode,
   updateExamAssignmentByAdmin,
   countSubmittedOrStartedSubmissionsByAssignment,
   deleteExamAssignmentByAdmin,
+  deleteTeacherAssignmentById,
   createManualSubmissions,
   submitExamPackage,
   publishExamAssignment,
@@ -501,6 +506,70 @@ const createLearningMaterial = async (req, res) => {
   } catch (error) {
     removeLocalUpload(req.file?.path);
     return errorResponse(res, 500, "Failed Create Material", error.message);
+  }
+};
+
+const updateLearningMaterial = async (req, res) => {
+  try {
+    const { materialId } = req.params;
+    const currentMaterial = await getMaterialById(materialId);
+
+    if (!currentMaterial || Number(currentMaterial.school_id) !== Number(req.schoolId)) {
+      removeLocalUpload(req.file?.path);
+      return errorResponse(res, 404, "Material not found");
+    }
+
+    if (Number(currentMaterial.teacher_id) !== Number(req.userId)) {
+      removeLocalUpload(req.file?.path);
+      return errorResponse(res, 403, "Forbidden material access");
+    }
+
+    const nextTitle = String(req.body?.title || currentMaterial.title || "").trim();
+    if (!nextTitle) {
+      removeLocalUpload(req.file?.path);
+      return errorResponse(res, 400, "title is required");
+    }
+
+    let attachmentUrl = currentMaterial.attachment_url || null;
+    if (String(req.body?.remove_attachment || "").toLowerCase() === "true") {
+      attachmentUrl = null;
+    } else {
+      const attachmentPayload = await resolveAttachmentPayload(req);
+      if (attachmentPayload.attachmentUrl) {
+        attachmentUrl = attachmentPayload.attachmentUrl;
+      }
+    }
+
+    const material = await updateMaterial(materialId, {
+      title: nextTitle,
+      content: req.body?.content ?? currentMaterial.content ?? "",
+      attachmentUrl,
+    });
+
+    return successResponse(res, 200, "Success Update Material", material);
+  } catch (error) {
+    removeLocalUpload(req.file?.path);
+    return errorResponse(res, 500, "Failed Update Material", error.message);
+  }
+};
+
+const deleteLearningMaterial = async (req, res) => {
+  try {
+    const { materialId } = req.params;
+    const currentMaterial = await getMaterialById(materialId);
+
+    if (!currentMaterial || Number(currentMaterial.school_id) !== Number(req.schoolId)) {
+      return errorResponse(res, 404, "Material not found");
+    }
+
+    if (Number(currentMaterial.teacher_id) !== Number(req.userId)) {
+      return errorResponse(res, 403, "Forbidden material access");
+    }
+
+    const deletedMaterial = await deleteMaterialById(materialId);
+    return successResponse(res, 200, "Success Delete Material", deletedMaterial);
+  } catch (error) {
+    return errorResponse(res, 500, "Failed Delete Material", error.message);
   }
 };
 
@@ -1504,6 +1573,98 @@ const createLearningAssignment = async (req, res) => {
   }
 };
 
+const updateLearningAssignmentByTeacher = async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const assignment = await getAssignmentById(assignmentId);
+
+    if (!assignment || Number(assignment.school_id) !== Number(req.schoolId)) {
+      removeLocalUpload(req.file?.path);
+      return errorResponse(res, 404, "Assignment not found");
+    }
+
+    if (Number(assignment.teacher_id) !== Number(req.userId)) {
+      removeLocalUpload(req.file?.path);
+      return errorResponse(res, 403, "Forbidden assignment access");
+    }
+
+    if (assignment.is_exam || !["FILE", "MANUAL"].includes(assignment.assignment_type)) {
+      removeLocalUpload(req.file?.path);
+      return errorResponse(res, 400, "Assignment type cannot be edited from this module");
+    }
+
+    const nextTitle = String(req.body?.title || assignment.title || "").trim();
+    if (!nextTitle) {
+      removeLocalUpload(req.file?.path);
+      return errorResponse(res, 400, "title is required");
+    }
+
+    const nextAssignmentType = normalizeAssignmentType(req.body?.assignment_type || assignment.assignment_type);
+    if (!["FILE", "MANUAL"].includes(nextAssignmentType)) {
+      removeLocalUpload(req.file?.path);
+      return errorResponse(res, 400, "Invalid assignment_type");
+    }
+
+    const hasActivity = await countSubmittedOrStartedSubmissionsByAssignment(assignmentId);
+    if (hasActivity > 0 && nextAssignmentType !== assignment.assignment_type) {
+      removeLocalUpload(req.file?.path);
+      return errorResponse(res, 400, "assignment_type cannot be changed after student activity exists");
+    }
+
+    let attachmentUrl = assignment.attachment_url || null;
+    if (nextAssignmentType === "MANUAL" || String(req.body?.remove_attachment || "").toLowerCase() === "true") {
+      attachmentUrl = null;
+    } else {
+      const attachmentPayload = await resolveAttachmentPayload(req);
+      if (attachmentPayload.attachmentUrl) {
+        attachmentUrl = attachmentPayload.attachmentUrl;
+      }
+    }
+
+    const updatedAssignment = await updateTeacherAssignment(assignmentId, {
+      title: nextTitle,
+      description: req.body?.description ?? assignment.description ?? "",
+      assignmentType: nextAssignmentType,
+      attachmentUrl,
+      dueDate: req.body?.due_date || null,
+    });
+
+    return successResponse(res, 200, "Success Update Assignment", updatedAssignment);
+  } catch (error) {
+    removeLocalUpload(req.file?.path);
+    return errorResponse(res, 500, "Failed Update Assignment", error.message);
+  }
+};
+
+const deleteLearningAssignmentByTeacher = async (req, res) => {
+  try {
+    const { assignmentId } = req.params;
+    const assignment = await getAssignmentById(assignmentId);
+
+    if (!assignment || Number(assignment.school_id) !== Number(req.schoolId)) {
+      return errorResponse(res, 404, "Assignment not found");
+    }
+
+    if (Number(assignment.teacher_id) !== Number(req.userId)) {
+      return errorResponse(res, 403, "Forbidden assignment access");
+    }
+
+    if (assignment.is_exam || !["FILE", "MANUAL"].includes(assignment.assignment_type)) {
+      return errorResponse(res, 400, "Assignment type cannot be deleted from this module");
+    }
+
+    const hasActivity = await countSubmittedOrStartedSubmissionsByAssignment(assignmentId);
+    if (hasActivity > 0) {
+      return errorResponse(res, 400, "Assignment already has student activity and cannot be deleted");
+    }
+
+    const deletedAssignment = await deleteTeacherAssignmentById(assignmentId);
+    return successResponse(res, 200, "Success Delete Assignment", deletedAssignment);
+  } catch (error) {
+    return errorResponse(res, 500, "Failed Delete Assignment", error.message);
+  }
+};
+
 const submitExamPackageByTeacher = async (req, res) => {
   try {
     const { assignmentId } = req.params;
@@ -2284,6 +2445,8 @@ module.exports = {
   getTeacherSubjects,
   getStudentSubjects,
   createLearningMaterial,
+  updateLearningMaterial,
+  deleteLearningMaterial,
   generateLearningMaterialPptWithAi,
   publishLearningMaterialPptWithAi,
   createLearningQuestionBankItem,
@@ -2301,6 +2464,8 @@ module.exports = {
   markSubjectChatAsRead,
   getLearningChatSummary,
   createLearningAssignment,
+  updateLearningAssignmentByTeacher,
+  deleteLearningAssignmentByTeacher,
   submitExamPackageByTeacher,
   updateExamRequestByAdmin,
   deleteExamRequestByAdmin,

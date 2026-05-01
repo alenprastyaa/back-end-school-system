@@ -437,6 +437,54 @@ const createMaterial = async (subjectId, title, content, attachmentUrl, createdB
   return result.rows[0];
 };
 
+const getMaterialById = async (id) => {
+  await ensureLearningSchema();
+  const result = await pool.query(
+    `
+      SELECT
+        lm.*,
+        ls.school_id,
+        ls.class_id,
+        ls.teacher_id
+      FROM learning_materials lm
+      INNER JOIN learning_subjects ls ON ls.id = lm.subject_id
+      WHERE lm.id = $1
+      LIMIT 1
+    `,
+    [id],
+  );
+  return result.rows[0];
+};
+
+const updateMaterial = async (id, { title, content, attachmentUrl }) => {
+  await ensureLearningSchema();
+  const result = await pool.query(
+    `
+      UPDATE learning_materials
+      SET title = $1,
+          content = $2,
+          attachment_url = $3
+      WHERE id = $4
+      RETURNING *
+    `,
+    [title, content || null, attachmentUrl || null, id],
+  );
+  return result.rows[0];
+};
+
+const deleteMaterialById = async (id) => {
+  await ensureLearningSchema();
+  const result = await pool.query(
+    `
+      DELETE FROM learning_materials
+      WHERE id = $1
+      RETURNING *
+    `,
+    [id],
+  );
+  return result.rows[0];
+};
+
 const createQuestionBankItem = async (
   subjectId,
   questionType,
@@ -943,6 +991,33 @@ const createAssignment = async (
   return result.rows[0];
 };
 
+const updateTeacherAssignment = async (
+  assignmentId,
+  {
+    title,
+    description,
+    assignmentType,
+    attachmentUrl,
+    dueDate,
+  },
+) => {
+  await ensureLearningSchema();
+  const result = await pool.query(
+    `
+      UPDATE learning_assignments
+      SET title = $1,
+          description = $2,
+          assignment_type = $3,
+          attachment_url = $4,
+          due_date = $5
+      WHERE id = $6
+      RETURNING *
+    `,
+    [title, description || null, assignmentType, attachmentUrl || null, dueDate || null, assignmentId],
+  );
+  return result.rows[0];
+};
+
 const submitExamPackage = async (
   assignmentId,
   {
@@ -1100,6 +1175,19 @@ const countSubmittedOrStartedSubmissionsByAssignment = async (assignmentId) => {
 };
 
 const deleteExamAssignmentByAdmin = async (assignmentId) => {
+  await ensureLearningSchema();
+  const result = await pool.query(
+    `
+      DELETE FROM learning_assignments
+      WHERE id = $1
+      RETURNING *
+    `,
+    [assignmentId],
+  );
+  return result.rows[0];
+};
+
+const deleteTeacherAssignmentById = async (assignmentId) => {
   await ensureLearningSchema();
   const result = await pool.query(
     `
@@ -1574,6 +1662,9 @@ module.exports = {
   getSubjectsByTeacher,
   getSubjectsByStudent,
   createMaterial,
+  getMaterialById,
+  updateMaterial,
+  deleteMaterialById,
   createQuestionBankItem,
   createQuestionBankItemsBulk,
   getQuestionBankItemById,
@@ -1588,10 +1679,12 @@ module.exports = {
   markChatSubjectAsRead,
   getChatUnreadSummaryBySubjectIds,
   createAssignment,
+  updateTeacherAssignment,
   getExamAssignmentByCode,
   updateExamAssignmentByAdmin,
   countSubmittedOrStartedSubmissionsByAssignment,
   deleteExamAssignmentByAdmin,
+  deleteTeacherAssignmentById,
   createManualSubmissions,
   submitExamPackage,
   publishExamAssignment,

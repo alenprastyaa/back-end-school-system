@@ -10,6 +10,8 @@ const {
   getTeacherSubjects,
   getStudentSubjects,
   createLearningMaterial,
+  updateLearningMaterial,
+  deleteLearningMaterial,
   generateLearningMaterialPptWithAi,
   publishLearningMaterialPptWithAi,
   createLearningQuestionBankItem,
@@ -27,6 +29,8 @@ const {
   markSubjectChatAsRead,
   getLearningChatSummary,
   createLearningAssignment,
+  updateLearningAssignmentByTeacher,
+  deleteLearningAssignmentByTeacher,
   submitExamPackageByTeacher,
   updateExamRequestByAdmin,
   deleteExamRequestByAdmin,
@@ -64,6 +68,17 @@ router.post(
   checkRole(["GURU"]),
   upload.single("attachment"),
   createLearningMaterial,
+);
+router.put(
+  "/materials/:materialId",
+  checkRole(["GURU"]),
+  upload.single("attachment"),
+  updateLearningMaterial,
+);
+router.delete(
+  "/materials/:materialId",
+  checkRole(["GURU"]),
+  deleteLearningMaterial,
 );
 router.post(
   "/subjects/:subjectId/materials/generate-ai-pptx",
@@ -155,6 +170,17 @@ router.post(
   checkRole(["GURU", "ADMIN"]),
   upload.single("attachment"),
   createLearningAssignment,
+);
+router.put(
+  "/assignments/:assignmentId",
+  checkRole(["GURU"]),
+  upload.single("attachment"),
+  updateLearningAssignmentByTeacher,
+);
+router.delete(
+  "/assignments/:assignmentId",
+  checkRole(["GURU"]),
+  deleteLearningAssignmentByTeacher,
 );
 router.post(
   "/assignments/:assignmentId/exam-package",
