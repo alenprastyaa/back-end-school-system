@@ -76,6 +76,23 @@ const emitNotificationToUsers = (userIds = [], payload = {}) => {
   });
 };
 
+const normalizeExternalUrl = (value) => {
+  const rawValue = String(value || "").trim();
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(rawValue);
+    if (parsed.protocol === "http:" && ["alentest.my.id", "school-system.my.id"].includes(parsed.hostname)) {
+      parsed.protocol = "https:";
+    }
+    return parsed.toString();
+  } catch (error) {
+    return rawValue;
+  }
+};
+
 const removeLocalUpload = (filePath) => {
   if (filePath && fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);
@@ -90,6 +107,28 @@ const uploadOptionalAttachment = async (file) => {
   const uploadedUrl = await uploadImage(file);
   removeLocalUpload(file.path);
   return uploadedUrl;
+};
+
+const resolveAttachmentPayload = async (req, fieldName = "attachment") => {
+  const directUrl = normalizeExternalUrl(req.body?.[`${fieldName}_url`] || req.body?.attachment_url);
+  if (directUrl) {
+    return {
+      attachmentUrl: directUrl,
+      attachmentName: String(req.body?.[`${fieldName}_name`] || req.body?.attachment_name || "").trim() || null,
+      attachmentMimeType: String(req.body?.[`${fieldName}_mime_type`] || req.body?.attachment_mime_type || "").trim() || null,
+      attachmentSize: Number(req.body?.[`${fieldName}_size`] || req.body?.attachment_size) || null,
+      source: "direct",
+    };
+  }
+
+  const uploadedUrl = await uploadOptionalAttachment(req.file);
+  return {
+    attachmentUrl: uploadedUrl,
+    attachmentName: req.file?.originalname || null,
+    attachmentMimeType: req.file?.mimetype || null,
+    attachmentSize: req.file?.size || null,
+    source: req.file ? "backend-upload" : "none",
+  };
 };
 
 const ensureTeacherInSchool = async (schoolId, teacherId) => {
@@ -430,7 +469,7 @@ const createLearningMaterial = async (req, res) => {
       return errorResponse(res, access.error.status, access.error.message);
     }
 
-    const attachmentUrl = await uploadOptionalAttachment(req.file);
+    const { attachmentUrl } = await resolveAttachmentPayload(req);
     const material = await createMaterial(
       subject_id,
       title,
@@ -498,7 +537,7 @@ const createSubjectChatMessage = async (req, res) => {
     const message = String(req.body.message || "").trim();
     const student = req.userRole === "SISWA" ? await getStudentById(req.userId) : null;
 
-    if (!message && !req.file) {
+    if (!message && !req.file && !req.body?.attachment_url) {
       return errorResponse(res, 400, "message or attachment is required");
     }
 
@@ -515,11 +554,18 @@ const createSubjectChatMessage = async (req, res) => {
       return errorResponse(res, access.error.status, access.error.message);
     }
 
-    const attachmentUrl = await uploadOptionalAttachment(req.file);
+    const attachmentPayload = await resolveAttachmentPayload(req);
+    const attachmentUrl = attachmentPayload.attachmentUrl;
     let messageType = "TEXT";
 
-    if (req.file) {
-      const mimeType = String(req.file.mimetype || "").toLowerCase();
+    if (attachmentUrl) {
+      const mimeType = String(
+        attachmentPayload.attachmentMimeType
+        || req.body?.attachment_mime_type
+        || req.body?.mime_type
+        || req.body?.message_mime_type
+        || "",
+      ).toLowerCase();
       if (mimeType.startsWith("audio/")) {
         messageType = "VOICE";
       } else if (mimeType.startsWith("image/")) {
@@ -535,9 +581,9 @@ const createSubjectChatMessage = async (req, res) => {
       message,
       messageType,
       attachmentUrl,
-      attachmentName: req.file?.originalname || null,
-      attachmentMimeType: req.file?.mimetype || null,
-      attachmentSize: req.file?.size || null,
+      attachmentName: attachmentPayload.attachmentName,
+      attachmentMimeType: attachmentPayload.attachmentMimeType,
+      attachmentSize: attachmentPayload.attachmentSize,
     });
     const io = getIo();
     if (io) {
@@ -1205,7 +1251,7 @@ const createLearningAssignment = async (req, res) => {
       }
     }
 
-    const attachmentUrl = await uploadOptionalAttachment(req.file);
+    const { attachmentUrl } = await resolveAttachmentPayload(req);
     const assignment = await createAssignment(
       subject_id,
       title,
@@ -1790,7 +1836,7 @@ const submitLearningAssignment = async (req, res) => {
     }
 
     if (assignment.assignment_type === "FILE") {
-      const attachmentUrl = await uploadOptionalAttachment(req.file);
+      const { attachmentUrl } = await resolveAttachmentPayload(req);
       submission = await upsertSubmission(
         assignmentId,
         req.userId,
