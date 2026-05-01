@@ -2194,14 +2194,6 @@ const submitLearningAssignment = async (req, res) => {
         return errorResponse(res, 400, "Quiz attempt has not been started");
       }
 
-      const durationWindowMs = getQuizDurationWindowMs(assignment);
-      if (durationWindowMs > 0) {
-        const expiresAt = new Date(new Date(existingSubmission.started_at).getTime() + durationWindowMs);
-        if (expiresAt.getTime() + 2000 < Date.now()) {
-          return errorResponse(res, 400, "Quiz time has expired");
-        }
-      }
-
       const parsedAnswers = parseStudentAnswers(
         assignment.assignment_type,
         answers,
