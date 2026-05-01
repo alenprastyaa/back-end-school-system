@@ -264,10 +264,17 @@ const parseStudentAnswers = (assignmentType, rawAnswers, quizPayload) => {
 
   return answers.map((answer, index) => {
     if (assignmentType === "MCQ") {
-      const selectedOption = Number(answer.selected_option);
-      if (!Number.isInteger(selectedOption)) {
+      const selectedOptionRaw = answer?.selected_option;
+      if (selectedOptionRaw === null || selectedOptionRaw === undefined || selectedOptionRaw === "") {
+        return { selected_option: null };
+      }
+
+      const selectedOption = Number(selectedOptionRaw);
+      const optionCount = Array.isArray(quizPayload[index]?.options) ? quizPayload[index].options.length : 0;
+      if (!Number.isInteger(selectedOption) || selectedOption < 0 || selectedOption >= optionCount) {
         throw new Error(`Answer for question ${index + 1} is invalid`);
       }
+
       return { selected_option: selectedOption };
     }
 
@@ -281,7 +288,8 @@ const calculateMcqScore = (quizPayload, answers) => {
   let correctCount = 0;
 
   quizPayload.forEach((question, index) => {
-    if (Number(question.correct_option) === Number(answers[index]?.selected_option)) {
+    const selectedOption = answers[index]?.selected_option;
+    if (Number.isInteger(selectedOption) && Number(question.correct_option) === selectedOption) {
       correctCount += 1;
     }
   });
