@@ -314,6 +314,19 @@ const updateSubject = async (id, schoolId, classId, teacherId, name, description
   return result.rows[0];
 };
 
+const deleteSubject = async (id, schoolId) => {
+  await ensureLearningSchema();
+  const result = await pool.query(
+    `
+      DELETE FROM learning_subjects
+      WHERE id = $1 AND school_id = $2
+      RETURNING *
+    `,
+    [id, schoolId],
+  );
+  return result.rows[0];
+};
+
 const getSubjectById = async (id) => {
   await ensureLearningSchema();
   const result = await pool.query(
@@ -1555,6 +1568,7 @@ module.exports = {
   ensureLearningSchema,
   createSubject,
   updateSubject,
+  deleteSubject,
   getSubjectById,
   getSubjectsBySchool,
   getSubjectsByTeacher,

@@ -12,6 +12,7 @@ const { generateQuestionBankItemsWithOpenRouter } = require("../services/openRou
 const {
   createSubject,
   updateSubject,
+  deleteSubject,
   getSubjectById,
   getSubjectsBySchool,
   getSubjectsByTeacher,
@@ -377,6 +378,22 @@ const updateLearningSubject = async (req, res) => {
   } catch (error) {
     removeLocalUpload(req.file?.path);
     return errorResponse(res, 500, "Failed Update Subject", error.message);
+  }
+};
+
+const deleteLearningSubject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const subject = await getSubjectById(id);
+
+    if (!subject || Number(subject.school_id) !== Number(req.schoolId)) {
+      return errorResponse(res, 404, "Subject not found");
+    }
+
+    const deletedSubject = await deleteSubject(id, req.schoolId);
+    return successResponse(res, 200, "Success Delete Subject", deletedSubject);
+  } catch (error) {
+    return errorResponse(res, 500, "Failed Delete Subject", error.message);
   }
 };
 
@@ -2107,6 +2124,7 @@ const getQuizAssignmentOverviewForTeacher = async (req, res) => {
 module.exports = {
   createLearningSubject,
   updateLearningSubject,
+  deleteLearningSubject,
   updateLearningSubjectChatIconByTeacher,
   getAdminSubjects,
   getTeacherSubjects,

@@ -4,6 +4,7 @@ const { verifyToken, checkRole } = require("../middlewares/AuthMiddleware");
 const {
   createLearningSubject,
   updateLearningSubject,
+  deleteLearningSubject,
   updateLearningSubjectChatIconByTeacher,
   getAdminSubjects,
   getTeacherSubjects,
@@ -45,6 +46,7 @@ router.use(verifyToken);
 
 router.post("/subjects", checkRole(["ADMIN"]), upload.single("chat_icon"), createLearningSubject);
 router.put("/subjects/:id", checkRole(["ADMIN"]), upload.single("chat_icon"), updateLearningSubject);
+router.delete("/subjects/:id", checkRole(["ADMIN"]), deleteLearningSubject);
 router.get("/subjects/admin", checkRole(["ADMIN"]), getAdminSubjects);
 router.get("/subjects/teacher", checkRole(["GURU"]), getTeacherSubjects);
 router.get("/subjects/student", checkRole(["SISWA"]), getStudentSubjects);
