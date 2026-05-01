@@ -7,6 +7,7 @@ const {
   GetStudentsByHomeroomTeacher,
   getStudentById,
   EditStudent,
+  deleteUserById,
 } = require("../models/UserModel");
 const { successResponse, errorResponse } = require("../utils/response");
 const bcrypt = require("bcryptjs");
@@ -169,4 +170,29 @@ const GetStudentReceiptForTeacher = async (req, res) => {
   }
 };
 
-module.exports = { RegisterStudent, GetStudents, EditStudents, GetMyClassStudents, GetStudentAttendanceForTeacher, GetStudentReceiptForTeacher };
+const DeleteStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const school_id = req.schoolId;
+
+    const student = await getStudentById(id);
+    if (!student || Number(student.school_id) !== Number(school_id)) {
+      return errorResponse(res, 404, "Student not found");
+    }
+
+    if (student.role !== 'SISWA') {
+      return errorResponse(res, 400, "Target user is not a student");
+    }
+
+    const deleted = await deleteUserById(id, school_id);
+    if (!deleted) {
+      return errorResponse(res, 404, "Student not found or already deleted");
+    }
+
+    return successResponse(res, 200, `Siswa "${deleted.username}" berhasil dihapus`);
+  } catch (error) {
+    return errorResponse(res, 500, "Failed Delete Student", error.message);
+  }
+};
+
+module.exports = { RegisterStudent, GetStudents, EditStudents, GetMyClassStudents, GetStudentAttendanceForTeacher, GetStudentReceiptForTeacher, DeleteStudent };

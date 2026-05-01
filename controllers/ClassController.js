@@ -1,4 +1,4 @@
-const {createClass, getClass, updateClass, getClassById, getClassByWaliGuru} = require('../models/ClassModel')
+const {createClass, getClass, updateClass, getClassById, getClassByWaliGuru, deleteClass} = require('../models/ClassModel')
 const { successResponse, errorResponse } = require('../utils/response')
 const { getUsersByRoleAndSchool } = require('../models/UserModel')
 
@@ -82,4 +82,25 @@ const GetMyClass = async (req, res) => {
     }
 };
 
-module.exports = {CreateClass, GetClass, UpdateClass, GetMyClass}
+const DeleteClass = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const school_id = req.schoolId;
+
+        const currentClass = await getClassById(id);
+        if (!currentClass || Number(currentClass.school_id) !== Number(school_id)) {
+            return errorResponse(res, 404, "Class not found");
+        }
+
+        const deleted = await deleteClass(id, school_id);
+        if (!deleted) {
+            return errorResponse(res, 404, "Class not found or already deleted");
+        }
+
+        return successResponse(res, 200, `Kelas "${deleted.class_name}" berhasil dihapus`);
+    } catch (error) {
+        return errorResponse(res, 500, "Failed Delete Class", error.message);
+    }
+};
+
+module.exports = {CreateClass, GetClass, UpdateClass, GetMyClass, DeleteClass}

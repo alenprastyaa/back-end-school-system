@@ -230,9 +230,12 @@ const updateOwnProfile = async ({
 };
 
 
-const findByUsername = async (username) => {
-  const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+const deleteUserById = async (id, school_id) => {
+  const result = await pool.query(
+    `DELETE FROM users WHERE id = $1 AND school_id = $2 RETURNING id, username, role`,
+    [id, school_id]
+  );
   return result.rows[0];
 };
 
-module.exports = { createUser, findByUsername, createStudent, GetStudent, GetStudentsByHomeroomTeacher, EditStudent, getStudentById, getUsersByRoleAndSchool, getUserById, getStudentsByClass, updateUserSchool, getOwnProfile, updateOwnProfile };
+module.exports = { createUser, findByUsername, createStudent, GetStudent, GetStudentsByHomeroomTeacher, EditStudent, getStudentById, getUsersByRoleAndSchool, getUserById, getStudentsByClass, updateUserSchool, getOwnProfile, updateOwnProfile, deleteUserById };

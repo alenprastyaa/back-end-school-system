@@ -70,4 +70,12 @@ const getClassByWaliGuru = async (wali_guru_id, school_id) => {
   return result.rows[0];
 };
 
-module.exports = {createClass, getClass, getClassById, updateClass, getClassByWaliGuru}
+const deleteClass = async (id, school_id) => {
+  const result = await pool.query(
+    `DELETE FROM class WHERE id = $1 AND school_id = $2 RETURNING id, class_name`,
+    [id, school_id]
+  );
+  return result.rows[0];
+};
+
+module.exports = {createClass, getClass, getClassById, updateClass, getClassByWaliGuru, deleteClass}

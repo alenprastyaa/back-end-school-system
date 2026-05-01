@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const UserModel = require('../models/UserModel');
+const { deleteUserById } = require('../models/UserModel');
 const SchoolModel = require('../models/SchoolModel')
 const { successResponse, errorResponse } = require('../utils/response');
 const { uploadImage } = require("../utils/upload");
@@ -196,4 +197,28 @@ const updateMyProfile = async (req, res) => {
   }
 };
 
-module.exports = { register, login, registerUserSchool, getUserSchoolList, updateUserSchool, getMyProfile, updateMyProfile };
+const deleteUserSchool = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = await UserModel.getUserById(id);
+
+    if (!currentUser || Number(currentUser.school_id) !== Number(req.schoolId)) {
+      return errorResponse(res, 404, "User school not found");
+    }
+
+    if (!['ADMIN', 'GURU'].includes(currentUser.role)) {
+      return errorResponse(res, 400, "Only school admin and teacher can be deleted here");
+    }
+
+    const deleted = await deleteUserById(id, req.schoolId);
+    if (!deleted) {
+      return errorResponse(res, 404, "User not found or already deleted");
+    }
+
+    return successResponse(res, 200, `User "${deleted.username}" berhasil dihapus`);
+  } catch (error) {
+    return errorResponse(res, 500, "Failed Delete User School", error.message);
+  }
+};
+
+module.exports = { register, login, registerUserSchool, getUserSchoolList, updateUserSchool, getMyProfile, updateMyProfile, deleteUserSchool };
